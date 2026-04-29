@@ -1,0 +1,6 @@
+{
+  "name": "MusicBridge",
+  "description": "Ecossistema inteligente para prática e ensino musical com reconhecimento de acordes, conversão de YouTube em cifras e ferramentas de prática em tempo real.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": []
+}

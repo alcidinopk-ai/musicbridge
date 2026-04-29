@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  :root {
+    --bg-hardware: #151619;
+    --border-hardware: #2D2E32;
+    --accent-glow: #00FF9C;
+    --accent-warn: #FF4444;
+  }
+
+  body {
+    background-color: #0c0d0e;
+    color: #e0e0e0;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer components {
+  .hardware-card {
+    background-color: var(--bg-hardware);
+    border: 1px solid var(--border-hardware);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.05);
+  }
+
+  .led-glow {
+    filter: drop-shadow(0 0 5px var(--accent-glow));
+  }
+
+  .lcd-display {
+    background-color: #1a1b1e;
+    border: 2px solid #000;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+    font-family: var(--font-mono);
+  }
+}
