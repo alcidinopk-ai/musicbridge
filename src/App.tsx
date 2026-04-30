@@ -8,7 +8,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TunerWidget } from './components/TunerWidget';
 import { MetronomeWidget } from './components/MetronomeWidget';
 import { ChordVisualizer } from './components/ChordVisualizer';
@@ -21,14 +21,185 @@ import {
   LayoutDashboard,
   Mic2,
   Users,
-  Library
+  Library,
+  LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabase, testSupabaseConnection } from './lib/supabase';
+import { User as AppUser } from './types';
 
 type View = 'practice' | 'education' | 'chat';
 
 export default function App() {
   const [activeView, setActiveView] = useState<View>('practice');
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'testing' | 'ok' | 'error'>('testing');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Test Connection
+    testSupabaseConnection().then(res => {
+      console.log('Supabase Connection Test:', res);
+      setConnectionStatus(res.success ? 'ok' : 'error');
+    });
+
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        // In a real app we'd fetch profile here
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata.full_name || 'User',
+          email: session.user.email || '',
+          role: 'teacher' // Defaulting for demo
+        });
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata.full_name || 'User',
+          email: session.user.email || '',
+          role: 'teacher'
+        });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { 
+          redirectTo: window.location.origin,
+          skipBrowserRedirect: false
+        }
+      });
+      if (error) throw error;
+      console.log('Login shift initiated:', data);
+    } catch (err: any) {
+      console.error('Login error:', err.message);
+      alert('Login error: ' + err.message);
+    }
+  };
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      console.log('Password login success:', data);
+    } catch (err: any) {
+      console.error('Password login error:', err.message);
+      setLoginError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  if (!user) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-[#0c0d0e] p-4">
+        <div className="hardware-card p-10 flex flex-col items-center gap-6 max-w-sm w-full text-center">
+          <div className="w-16 h-16 bg-[#00FF9C] rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(0,255,156,0.2)]">
+            <Music2 className="text-black" size={32} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold mb-1">MusicBridge</h1>
+            <p className="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Console Access</p>
+          </div>
+
+          <form onSubmit={handlePasswordLogin} className="w-full flex flex-col gap-4">
+            <div className="flex flex-col gap-1 text-left">
+              <label className="text-[8px] font-mono text-gray-600 uppercase ml-1">Terminal.ID</label>
+              <input 
+                type="email" 
+                placeholder="email@access.key"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full bg-[#1a1b1e] border border-gray-800 rounded p-3 text-xs font-mono focus:border-[#00FF9C] outline-none transition-all text-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1 text-left">
+              <label className="text-[8px] font-mono text-gray-600 uppercase ml-1">Access.Code</label>
+              <input 
+                type="password" 
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full bg-[#1a1b1e] border border-gray-800 rounded p-3 text-xs font-mono focus:border-[#00FF9C] outline-none transition-all text-white"
+              />
+            </div>
+
+            {loginError && (
+              <div className="text-[10px] font-mono text-red-500 bg-red-500/10 p-2 rounded border border-red-500/20">
+                ERROR: {loginError.toUpperCase()}
+              </div>
+            )}
+
+            <button 
+              type="submit"
+              disabled={isLoading || connectionStatus !== 'ok'}
+              className={`w-full py-3 rounded font-bold transition-all font-mono text-xs uppercase tracking-wider
+                ${connectionStatus === 'ok' 
+                  ? 'bg-[#00FF9C] text-black hover:bg-[#00FF9C]/80' 
+                  : 'bg-gray-800 text-gray-500 cursor-not-allowed'}
+              `}
+            >
+              {isLoading ? 'Verifying...' : 'Initialize Session'}
+            </button>
+          </form>
+
+          <div className="w-full flex items-center gap-4 py-2">
+            <div className="h-[1px] bg-gray-800 flex-1" />
+            <span className="text-[8px] font-mono text-gray-700 uppercase">External Sync</span>
+            <div className="h-[1px] bg-gray-800 flex-1" />
+          </div>
+
+          <button 
+            onClick={handleGoogleLogin}
+            disabled={connectionStatus !== 'ok'}
+            className="w-full flex items-center justify-center gap-2 py-2 border border-gray-800 rounded font-mono text-[10px] uppercase tracking-wider hover:bg-white/5 transition-all text-gray-400"
+          >
+            <LogIn size={14} /> {connectionStatus === 'testing' ? 'Wait...' : 'Sso Google'}
+          </button>
+
+          <div className="flex items-center gap-2 justify-center">
+            <div className={`w-1 h-1 rounded-full ${
+              connectionStatus === 'ok' ? 'bg-[#00FF9C] led-glow' : 
+              connectionStatus === 'error' ? 'bg-red-500' : 'bg-yellow-500'
+            }`} />
+            <p className="text-[9px] text-gray-600 font-mono uppercase tracking-tighter">
+              {connectionStatus === 'ok' ? 'System Online' : 
+               connectionStatus === 'error' ? 'Link Failure' : 'Link Testing'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-[#0c0d0e] text-white overflow-hidden font-sans">
@@ -61,8 +232,17 @@ export default function App() {
 
         <div className="mt-auto flex flex-col gap-8 pb-4">
           <NavItem icon={<Settings size={22} />} active={false} onClick={() => {}} label="Setup" />
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-gray-800 to-gray-700 border border-gray-600 flex items-center justify-center overflow-hidden">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+          <div className="flex flex-col gap-4 items-center">
+             <button 
+               onClick={handleSignOut}
+               className="p-2 text-gray-600 hover:text-red-500 transition-colors"
+               title="Sign Out"
+             >
+                <LogIn size={20} className="rotate-180" />
+             </button>
+             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-gray-800 to-gray-700 border border-gray-600 flex items-center justify-center overflow-hidden">
+               <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt="User" />
+             </div>
           </div>
         </div>
       </nav>

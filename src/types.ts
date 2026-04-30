@@ -39,6 +39,7 @@ export interface Class {
 export interface Message {
   id: string;
   sender_id: string;
+  recipient_id: string;
   text: string;
   timestamp: number;
 }
